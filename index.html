@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Grid Game</title>
+    <title>Grid Game with Trail Mechanism</title>
     <style>
         /* CSS Styles */
         body {
@@ -51,12 +51,17 @@
             background-color: blue;
             border-color: blue;
         }
+
+        .trail {
+            background-color: red;
+            border-color: red;
+        }
     </style>
 </head>
 <body>
     <!-- HTML Content -->
     <div id="main-menu">
-        <h1>Grid Game</h1>
+        <h1>Grid Game with Trail</h1>
         <p>High Score: <span id="high-score">0</span></p>
         <button id="play-button">Play</button>
     </div>
@@ -69,9 +74,10 @@
         let gridSizeX, gridSizeY;
         let activeX, activeY;
         let timer;
-        let timeLimit = 3000; // Starts at 3000ms
+        let timeLimit = 1000; // Starts at 1000ms
         let score = 0;
         let highScore = localStorage.getItem('highScore') || 0;
+        let trailSquares = []; // Array to store trail positions
 
         const gridElement = document.getElementById('grid');
         const highScoreElement = document.getElementById('high-score');
@@ -87,8 +93,9 @@
         function startGame() {
             mainMenu.style.display = 'none';
             gameContainer.style.display = 'flex';
-            timeLimit = 3000;
+            timeLimit = 1000;
             score = 0;
+            trailSquares = [];
             initializeGrid();
             placeActiveSquare();
             startTimer();
@@ -118,7 +125,10 @@
         function placeActiveSquare() {
             if (activeX !== undefined && activeY !== undefined) {
                 const oldSquare = document.querySelector(`.square[data-x="${activeX}"][data-y="${activeY}"]`);
-                oldSquare.classList.remove('active');
+                if (oldSquare) {
+                    oldSquare.classList.remove('active');
+                    oldSquare.removeEventListener('click', onSquareClick);
+                }
             }
             const neighbors = getNeighbors(activeX, activeY);
             const randomNeighbor = neighbors[Math.floor(Math.random() * neighbors.length)];
@@ -135,12 +145,13 @@
 
         function getNeighbors(x, y) {
             const positions = [];
-            if (x > 0) positions.push({ x: x - 1, y });
-            if (x < gridSizeX - 1) positions.push({ x: x + 1, y });
-            if (y > 0) positions.push({ x, y: y - 1 });
-            if (y < gridSizeY - 1) positions.push({ x, y: y + 1 });
-            if (x === undefined || y === undefined) {
-                // If starting, pick the center position
+            if (x !== undefined && y !== undefined) {
+                if (x > 0) positions.push({ x: x - 1, y });
+                if (x < gridSizeX - 1) positions.push({ x: x + 1, y });
+                if (y > 0) positions.push({ x, y: y - 1 });
+                if (y < gridSizeY - 1) positions.push({ x, y: y + 1 });
+            } else {
+                // Starting position: center of the grid
                 positions.push({ x: Math.floor(gridSizeX / 2), y: Math.floor(gridSizeY / 2) });
             }
             return positions;
@@ -148,17 +159,85 @@
 
         function onSquareClick() {
             this.removeEventListener('click', onSquareClick);
+            this.classList.remove('active');
             score++;
-            timeLimit = Math.max(500, timeLimit - 10); // Decrease time limit, minimum 500ms
+            timeLimit = Math.max(200, timeLimit - 10); // Decrease time limit, minimum 200ms
             clearTimeout(timer);
-            startTimer();
             placeActiveSquare();
+            startTimer();
+        }
+
+        function onTrailSquareClick() {
+            const x = parseInt(this.dataset.x);
+            const y = parseInt(this.dataset.y);
+            const lastTrailSquare = trailSquares[trailSquares.length - 1];
+            if (x === lastTrailSquare.x && y === lastTrailSquare.y) {
+                // Correct trail square clicked
+                this.classList.remove('trail');
+                this.removeEventListener('click', onTrailSquareClick);
+                trailSquares.pop();
+                clearTimeout(timer);
+                startTimer();
+                if (trailSquares.length === 0) {
+                    // Trail cleared, resume game by placing the active square
+                    placeActiveSquare();
+                }
+            } else {
+                // Wrong square clicked (do nothing or provide feedback)
+            }
         }
 
         function startTimer() {
             timer = setTimeout(() => {
-                endGame();
+                if (trailSquares.length < 5) {
+                    addTrailSquare();
+                    startTimer();
+                } else {
+                    endGame();
+                }
             }, timeLimit);
+        }
+
+        function isInTrailMode() {
+            return trailSquares.length > 0;
+        }
+
+        function addTrailSquare() {
+            let newTrailSquare;
+            if (isInTrailMode()) {
+                // In trail mode, add neighboring square to last trail square
+                const lastTrailSquare = trailSquares[trailSquares.length - 1];
+                const neighbors = getNeighbors(lastTrailSquare.x, lastTrailSquare.y);
+                // Exclude positions already in the trail
+                const availableNeighbors = neighbors.filter(pos => {
+                    return !trailSquares.some(trailPos => trailPos.x === pos.x && trailPos.y === pos.y);
+                });
+                if (availableNeighbors.length > 0) {
+                    newTrailSquare = availableNeighbors[Math.floor(Math.random() * availableNeighbors.length)];
+                } else {
+                    // No available neighbors, cannot extend trail
+                    endGame();
+                    return;
+                }
+            } else {
+                // Not in trail mode, add current active square to trail
+                newTrailSquare = { x: activeX, y: activeY };
+            }
+
+            const squareElement = document.querySelector(`.square[data-x="${newTrailSquare.x}"][data-y="${newTrailSquare.y}"]`);
+            if (squareElement) {
+                squareElement.classList.remove('active');
+                squareElement.classList.add('trail');
+                squareElement.removeEventListener('click', onSquareClick);
+                squareElement.addEventListener('click', onTrailSquareClick);
+                trailSquares.push(newTrailSquare);
+
+                if (!isInTrailMode()) {
+                    // If we were not in trail mode, remove activeX and activeY
+                    activeX = undefined;
+                    activeY = undefined;
+                }
+            }
         }
 
         function endGame() {
@@ -171,6 +250,7 @@
             }
             activeX = undefined;
             activeY = undefined;
+            trailSquares = [];
             gameContainer.style.display = 'none';
             mainMenu.style.display = 'block';
         }
@@ -180,6 +260,17 @@
                 initializeGrid();
                 if (activeX >= gridSizeX || activeY >= gridSizeY) {
                     endGame();
+                } else if (isInTrailMode()) {
+                    // Update trail squares
+                    trailSquares.forEach(pos => {
+                        const square = document.querySelector(`.square[data-x="${pos.x}"][data-y="${pos.y}"]`);
+                        if (square) {
+                            square.classList.add('trail');
+                            square.addEventListener('click', onTrailSquareClick);
+                        } else {
+                            endGame();
+                        }
+                    });
                 } else {
                     placeActiveSquare();
                 }
