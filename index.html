@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Grid Game</title>
+    <style>
+        /* CSS Styles */
+        body {
+            margin: 0;
+            background-color: black;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        #main-menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #play-button {
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, 50px);
+            grid-template-rows: repeat(auto-fill, 50px);
+            gap: 2px;
+        }
+
+        .square {
+            width: 50px;
+            height: 50px;
+            border: 1px solid #555;
+            box-sizing: border-box;
+        }
+
+        .active {
+            background-color: blue;
+            border-color: blue;
+        }
+    </style>
+</head>
+<body>
+    <!-- HTML Content -->
+    <div id="main-menu">
+        <h1>Grid Game</h1>
+        <p>High Score: <span id="high-score">0</span></p>
+        <button id="play-button">Play</button>
+    </div>
+    <div id="game-container" style="display: none;">
+        <div id="grid"></div>
+    </div>
+
+    <script>
+        // JavaScript Code
+        let gridSizeX, gridSizeY;
+        let activeX, activeY;
+        let timer;
+        let timeLimit = 3000; // Starts at 3000ms
+        let score = 0;
+        let highScore = localStorage.getItem('highScore') || 0;
+
+        const gridElement = document.getElementById('grid');
+        const highScoreElement = document.getElementById('high-score');
+        const playButton = document.getElementById('play-button');
+        const mainMenu = document.getElementById('main-menu');
+        const gameContainer = document.getElementById('game-container');
+
+        highScoreElement.textContent = highScore;
+
+        playButton.addEventListener('click', startGame);
+        window.addEventListener('resize', onResize);
+
+        function startGame() {
+            mainMenu.style.display = 'none';
+            gameContainer.style.display = 'flex';
+            timeLimit = 3000;
+            score = 0;
+            initializeGrid();
+            placeActiveSquare();
+            startTimer();
+        }
+
+        function initializeGrid() {
+            gridElement.innerHTML = '';
+            calculateGridSize();
+            for (let y = 0; y < gridSizeY; y++) {
+                for (let x = 0; x < gridSizeX; x++) {
+                    const square = document.createElement('div');
+                    square.classList.add('square');
+                    square.dataset.x = x;
+                    square.dataset.y = y;
+                    gridElement.appendChild(square);
+                }
+            }
+        }
+
+        function calculateGridSize() {
+            gridSizeX = Math.floor(window.innerWidth / 52); // 50px square + 2px gap
+            gridSizeY = Math.floor(window.innerHeight / 52);
+            gridElement.style.gridTemplateColumns = `repeat(${gridSizeX}, 50px)`;
+            gridElement.style.gridTemplateRows = `repeat(${gridSizeY}, 50px)`;
+        }
+
+        function placeActiveSquare() {
+            if (activeX !== undefined && activeY !== undefined) {
+                const oldSquare = document.querySelector(`.square[data-x="${activeX}"][data-y="${activeY}"]`);
+                oldSquare.classList.remove('active');
+            }
+            const neighbors = getNeighbors(activeX, activeY);
+            const randomNeighbor = neighbors[Math.floor(Math.random() * neighbors.length)];
+            activeX = randomNeighbor.x;
+            activeY = randomNeighbor.y;
+            const newSquare = document.querySelector(`.square[data-x="${activeX}"][data-y="${activeY}"]`);
+            if (!newSquare) {
+                endGame();
+                return;
+            }
+            newSquare.classList.add('active');
+            newSquare.addEventListener('click', onSquareClick);
+        }
+
+        function getNeighbors(x, y) {
+            const positions = [];
+            if (x > 0) positions.push({ x: x - 1, y });
+            if (x < gridSizeX - 1) positions.push({ x: x + 1, y });
+            if (y > 0) positions.push({ x, y: y - 1 });
+            if (y < gridSizeY - 1) positions.push({ x, y: y + 1 });
+            if (x === undefined || y === undefined) {
+                // If starting, pick the center position
+                positions.push({ x: Math.floor(gridSizeX / 2), y: Math.floor(gridSizeY / 2) });
+            }
+            return positions;
+        }
+
+        function onSquareClick() {
+            this.removeEventListener('click', onSquareClick);
+            score++;
+            timeLimit = Math.max(500, timeLimit - 10); // Decrease time limit, minimum 500ms
+            clearTimeout(timer);
+            startTimer();
+            placeActiveSquare();
+        }
+
+        function startTimer() {
+            timer = setTimeout(() => {
+                endGame();
+            }, timeLimit);
+        }
+
+        function endGame() {
+            clearTimeout(timer);
+            alert(`Game Over! Your score: ${score}`);
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('highScore', highScore);
+                highScoreElement.textContent = highScore;
+            }
+            activeX = undefined;
+            activeY = undefined;
+            gameContainer.style.display = 'none';
+            mainMenu.style.display = 'block';
+        }
+
+        function onResize() {
+            if (gameContainer.style.display === 'flex') {
+                initializeGrid();
+                if (activeX >= gridSizeX || activeY >= gridSizeY) {
+                    endGame();
+                } else {
+                    placeActiveSquare();
+                }
+            }
+        }
+    </script>
+</body>
+</html>
