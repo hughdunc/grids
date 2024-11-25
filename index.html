@@ -5,12 +5,23 @@
     <title>grids</title>
     <style>
         /* CSS Styles */
-        body {
+        body, html {
             margin: 0;
+            padding: 0;
             background-color: #080808;
             color: white;
             font-family: monospace;
             text-align: center;
+            overflow: hidden;
+            height: 100%;
+            -webkit-touch-callout: none; /* Disable callouts */
+            -webkit-user-select: none; /* Disable text selection */
+            user-select: none;
+        }
+
+        :root {
+            --square-size: 50px;
+            --gap-size: 6px;
         }
 
         #main-menu {
@@ -53,17 +64,20 @@
 
         #grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, 50px);
-            grid-template-rows: repeat(auto-fill, 50px);
-            gap: 6px;
+            grid-template-columns: repeat(auto-fill, var(--square-size));
+            grid-template-rows: repeat(auto-fill, var(--square-size));
+            gap: var(--gap-size);
         }
 
         .square {
-            width: 50px;
-            height: 50px;
+            width: var(--square-size);
+            height: var(--square-size);
             border: 1px solid rgba(255,255,255,0.1);
             box-sizing: border-box;
             border-radius: 5px;
+            -webkit-tap-highlight-color: transparent; /* Remove tap highlight */
+            -webkit-touch-callout: none;
+            user-select: none;
         }
 
         .active {
@@ -114,6 +128,10 @@
         playButton.addEventListener('click', startGame);
         window.addEventListener('resize', onResize);
 
+        function isMobileDevice() {
+            return /Mobi|Android|iPhone|iPad|iPod|Opera Mini|IEMobile|Mobile/i.test(navigator.userAgent);
+        }
+
         function startGame() {
             mainMenu.style.display = 'none';
             gameContainer.style.display = 'flex';
@@ -121,11 +139,24 @@
             score = 0;
             clickCount = 0;
             trailSquares = [];
-            initializeGrid();
             activeX = undefined;
             activeY = undefined;
+            setSquareSize();
+            setGameContainerHeight();
+            initializeGrid();
             placeActiveSquare();
             startTimer();
+        }
+
+        function setSquareSize() {
+            let root = document.documentElement;
+            if (isMobileDevice()) {
+                root.style.setProperty('--square-size', '500px');
+                root.style.setProperty('--gap-size', '10px');
+            } else {
+                root.style.setProperty('--square-size', '50px');
+                root.style.setProperty('--gap-size', '6px');
+            }
         }
 
         function initializeGrid() {
@@ -143,10 +174,13 @@
         }
 
         function calculateGridSize() {
-            gridSizeX = Math.floor(window.innerWidth / 56); // 50px square + 6px gap
-            gridSizeY = Math.floor(window.innerHeight / 56);
-            gridElement.style.gridTemplateColumns = `repeat(${gridSizeX}, 50px)`;
-            gridElement.style.gridTemplateRows = `repeat(${gridSizeY}, 50px)`;
+            let squareSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--square-size'));
+            let gapSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--gap-size'));
+
+            gridSizeX = Math.floor(window.innerWidth / (squareSize + gapSize));
+            gridSizeY = Math.floor(window.innerHeight / (squareSize + gapSize));
+            gridElement.style.gridTemplateColumns = `repeat(${gridSizeX}, ${squareSize}px)`;
+            gridElement.style.gridTemplateRows = `repeat(${gridSizeY}, ${squareSize}px)`;
         }
 
         function placeActiveSquare() {
@@ -242,7 +276,7 @@
             this.classList.remove('clickable');
             score++;
             clickCount++;
-            timeLimit = Math.max(200, timeLimit - 20); // Decrease time limit, minimum 100ms
+            timeLimit = Math.max(100, timeLimit - 20); // Decrease time limit, minimum 100ms
             clearTimeout(timer);
 
             if (clickCount % 20 === 0) {
@@ -375,6 +409,7 @@
 
         function onResize() {
             if (gameContainer.style.display === 'flex') {
+                setGameContainerHeight();
                 initializeGrid();
                 if (activeX >= gridSizeX || activeY >= gridSizeY) {
                     endGame();
@@ -384,6 +419,15 @@
                 }
             }
         }
+
+        function setGameContainerHeight() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+            gameContainer.style.height = `calc(var(--vh, 1vh) * 100)`;
+        }
+
+        // Initial setup for game container height
+        setGameContainerHeight();
     </script>
 </body>
 </html>
