@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Grid Game with Visible Non-Clickable Trails</title>
+    <title>grids</title>
     <style>
         /* CSS Styles */
         body {
@@ -272,6 +272,7 @@
                 this.removeEventListener('click', onTrailSquareClick);
                 trailSquares.shift(); // Remove the first element
                 clickCount++;
+                score++;
                 clearTimeout(timer);
                 startTimer();
                 if (trailSquares.length === 0) {
