@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <title>grids</title>
+    <!-- Meta Viewport Tag -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
     <style>
+        /* CSS Styles */
         body, html {
             margin: 0;
             padding: 0;
@@ -14,10 +17,10 @@
             text-align: center;
             overflow: hidden;
             height: 100%;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
+            -webkit-touch-callout: none; /* Disable callouts */
+            -webkit-user-select: none; /* Disable text selection */
             user-select: none;
-            touch-action: manipulation;
+            touch-action: manipulation; /* Prevent double-tap-to-zoom */
         }
 
         :root {
@@ -53,7 +56,7 @@
             border: none;
             font-family: inherit;
             border-radius: 5px;
-            touch-action: manipulation;
+            touch-action: manipulation; /* Prevent double-tap-to-zoom on the button */
         }
 
         #game-container {
@@ -62,7 +65,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            touch-action: none;
+            touch-action: none; /* Prevent default touch actions in the game area */
         }
 
         #grid {
@@ -75,11 +78,13 @@
         .square {
             width: var(--square-size);
             height: var(--square-size);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255,255,255,0.1);
             box-sizing: border-box;
             border-radius: 5px;
-            -webkit-tap-highlight-color: transparent;
-            touch-action: none;
+            -webkit-tap-highlight-color: transparent; /* Remove tap highlight */
+            -webkit-touch-callout: none;
+            user-select: none;
+            touch-action: manipulation; /* Prevent double-tap-to-zoom on squares */
         }
 
         .active {
@@ -98,6 +103,7 @@
     </style>
 </head>
 <body>
+    <!-- HTML Content -->
     <div id="main-menu">
         <h1>grids</h1>
         <p>High Score: <span id="high-score">0</span></p>
@@ -108,15 +114,15 @@
     </div>
 
     <script>
+        // JavaScript Code
         let gridSizeX, gridSizeY;
         let activeX, activeY;
         let timer;
-        let timeLimit = 1000;
+        let timeLimit = 1000; // Starts at 1000ms
         let score = 0;
-        let clickCount = 0;
+        let clickCount = 0; // Counts clicks on both blue square and trail squares
         let highScore = localStorage.getItem('highScore') || 0;
-        let trailSquares = [];
-        let gameEnded = false;
+        let trailSquares = []; // Array to store trail positions
 
         const gridElement = document.getElementById('grid');
         const highScoreElement = document.getElementById('high-score');
@@ -133,14 +139,6 @@
             return /Mobi|Android|iPhone|iPad|iPod|Opera Mini|IEMobile|Mobile/i.test(navigator.userAgent);
         }
 
-        function handleEvent(event) {
-            event.preventDefault();
-            event.stopPropagation();
-            if (isMobileDevice() && event.type === "touchstart") return true;
-            if (!isMobileDevice() && event.type === "click") return true;
-            return false;
-        }
-
         function startGame() {
             mainMenu.style.display = 'none';
             gameContainer.style.display = 'flex';
@@ -150,8 +148,8 @@
             trailSquares = [];
             activeX = undefined;
             activeY = undefined;
-            gameEnded = false;
             setSquareSize();
+            setGameContainerHeight();
             initializeGrid();
             placeActiveSquare();
             startTimer();
@@ -159,8 +157,13 @@
 
         function setSquareSize() {
             let root = document.documentElement;
-            root.style.setProperty('--square-size', isMobileDevice() ? '50px' : '50px');
-            root.style.setProperty('--gap-size', isMobileDevice() ? '6px' : '6px');
+            if (isMobileDevice()) {
+                root.style.setProperty('--square-size', '500px');
+                root.style.setProperty('--gap-size', '10px');
+            } else {
+                root.style.setProperty('--square-size', '50px');
+                root.style.setProperty('--gap-size', '6px');
+            }
         }
 
         function initializeGrid() {
@@ -180,6 +183,7 @@
         function calculateGridSize() {
             let squareSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--square-size'));
             let gapSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--gap-size'));
+
             gridSizeX = Math.floor(window.innerWidth / (squareSize + gapSize));
             gridSizeY = Math.floor(window.innerHeight / (squareSize + gapSize));
             gridElement.style.gridTemplateColumns = `repeat(${gridSizeX}, ${squareSize}px)`;
@@ -187,7 +191,7 @@
         }
 
         function placeActiveSquare() {
-            if (gameEnded) return;
+            // Remove event listener from the old active square
             if (activeX !== undefined && activeY !== undefined) {
                 const oldSquare = getSquareElement(activeX, activeY);
                 if (oldSquare) {
@@ -195,55 +199,207 @@
                     oldSquare.removeEventListener('click', onSquareClick);
                 }
             }
-            let newPosition = getRandomEmptyPosition();
-            if (!newPosition) {
+
+            let newPosition;
+            if (activeX === undefined || activeY === undefined) {
+                // Start at a random empty position
+                newPosition = getRandomEmptyPosition();
+                if (!newPosition) {
+                    endGame();
+                    return;
+                }
+                activeX = newPosition.x;
+                activeY = newPosition.y;
+            } else {
+                // Move the blue square to a neighboring empty square (not a trail square)
+                const neighbors = getNeighbors(activeX, activeY);
+                // Exclude trail positions
+                const availablePositions = neighbors.filter(pos => !isTrailSquare(pos.x, pos.y));
+                if (availablePositions.length === 0) {
+                    // No available positions, end game
+                    endGame();
+                    return;
+                }
+                const randomNeighbor = availablePositions[Math.floor(Math.random() * availablePositions.length)];
+                activeX = randomNeighbor.x;
+                activeY = randomNeighbor.y;
+            }
+
+            const newSquare = getSquareElement(activeX, activeY);
+            if (!newSquare) {
                 endGame();
                 return;
             }
-            activeX = newPosition.x;
-            activeY = newPosition.y;
+            newSquare.classList.add('active');
 
-            const newSquare = getSquareElement(activeX, activeY);
-            newSquare.classList.add('active', 'clickable');
-            newSquare.addEventListener(isMobileDevice() ? 'touchstart' : 'click', onSquareClick);
-        }
-
-        function onSquareClick(event) {
-            if (!handleEvent(event)) return;
-            score++;
-            clickCount++;
-            timeLimit = Math.max(100, timeLimit - 20);
-            clearTimeout(timer);
-            placeActiveSquare();
-            startTimer();
-        }
-
-        function getSquareElement(x, y) {
-            return document.querySelector(`.square[data-x="${x}"][data-y="${y}"]`);
+            if (trailSquares.length === 0) {
+                // Only add event listener if there is no trail
+                newSquare.classList.add('clickable');
+                newSquare.addEventListener('click', onSquareClick);
+            }
         }
 
         function getRandomEmptyPosition() {
             let emptyPositions = [];
             for (let x = 0; x < gridSizeX; x++) {
                 for (let y = 0; y < gridSizeY; y++) {
-                    if (!(x === activeX && y === activeY)) {
-                        emptyPositions.push({ x, y });
+                    if (!isTrailSquare(x, y) && !(x === activeX && y === activeY)) {
+                        emptyPositions.push({ x: x, y: y });
                     }
                 }
             }
-            if (emptyPositions.length === 0) return null;
+            if (emptyPositions.length === 0) {
+                // No empty positions, end game
+                return null;
+            }
             return emptyPositions[Math.floor(Math.random() * emptyPositions.length)];
+        }
+
+        function isTrailSquare(x, y) {
+            return trailSquares.some(pos => pos.x === x && pos.y === y);
+        }
+
+        function getSquareElement(x, y) {
+            return document.querySelector(`.square[data-x="${x}"][data-y="${y}"]`);
+        }
+
+        function getNeighbors(x, y) {
+            const positions = [];
+            if (x !== undefined && y !== undefined) {
+                if (x > 0) positions.push({ x: x - 1, y });
+                if (x < gridSizeX - 1) positions.push({ x: x + 1, y });
+                if (y > 0) positions.push({ x, y: y - 1 });
+                if (y < gridSizeY - 1) positions.push({ x, y: y + 1 });
+            }
+            return positions;
+        }
+
+        function onSquareClick() {
+            if (trailSquares.length > 0) {
+                // Cannot click blue square if there is a trail
+                return;
+            }
+            this.removeEventListener('click', onSquareClick);
+            this.classList.remove('clickable');
+            score++;
+            clickCount++;
+            timeLimit = Math.max(100, timeLimit - 20); // Decrease time limit, minimum 100ms
+            clearTimeout(timer);
+
+            if (clickCount % 20 === 0) {
+                // Every 20 clicks, clear the trail and move blue square to random position
+                clearTrail();
+                const activeSquare = getSquareElement(activeX, activeY);
+                if (activeSquare) {
+                    activeSquare.classList.remove('active', 'clickable');
+                    activeSquare.removeEventListener('click', onSquareClick);
+                }
+                activeX = undefined;
+                activeY = undefined;
+                placeActiveSquare();
+            } else {
+                placeActiveSquare();
+            }
+            startTimer();
+        }
+
+        function onTrailSquareClick() {
+            const x = parseInt(this.dataset.x);
+            const y = parseInt(this.dataset.y);
+            const firstTrailSquare = trailSquares[0];
+            if (x === firstTrailSquare.x && y === firstTrailSquare.y) {
+                // Correct trail square clicked
+                this.classList.remove('trail', 'clickable');
+                this.removeEventListener('click', onTrailSquareClick);
+                trailSquares.shift(); // Remove the first element
+                clickCount++;
+                score++;
+                clearTimeout(timer);
+                startTimer();
+                if (trailSquares.length === 0) {
+                    // Trail cleared, make blue square clickable again
+                    const activeSquare = getSquareElement(activeX, activeY);
+                    if (activeSquare) {
+                        activeSquare.classList.add('clickable');
+                        activeSquare.addEventListener('click', onSquareClick);
+                    }
+                } else {
+                    // Update trail squares to make the new first one clickable
+                    updateTrailSquares();
+                }
+
+                if (clickCount % 20 === 0) {
+                    // Every 20 clicks, clear the trail and move blue square to random position
+                    clearTrail();
+                    const activeSquare = getSquareElement(activeX, activeY);
+                    if (activeSquare) {
+                        activeSquare.classList.remove('active', 'clickable');
+                        activeSquare.removeEventListener('click', onSquareClick);
+                    }
+                    activeX = undefined;
+                    activeY = undefined;
+                    placeActiveSquare();
+                }
+            }
         }
 
         function startTimer() {
             timer = setTimeout(() => {
-                endGame();
+                if (trailSquares.length >= 5) {
+                    endGame();
+                } else {
+                    if (trailSquares.length === 0) {
+                        // Can't click blue square until trail is cleared
+                        const activeSquare = getSquareElement(activeX, activeY);
+                        if (activeSquare) {
+                            activeSquare.classList.remove('clickable');
+                            activeSquare.removeEventListener('click', onSquareClick);
+                        }
+                    }
+                    addTrailSquare(); // Add trail at current position before moving
+                    placeActiveSquare(); // Move blue square to neighbor
+                    startTimer();
+                }
             }, timeLimit);
         }
 
+        function addTrailSquare() {
+            // Add a trail square at the current position of the blue square
+            const trailSquare = { x: activeX, y: activeY };
+            trailSquares.push(trailSquare);
+            updateTrailSquares();
+        }
+
+        function updateTrailSquares() {
+            // Update all trail squares
+            trailSquares.forEach((pos, index) => {
+                const square = getSquareElement(pos.x, pos.y);
+                if (square) {
+                    square.classList.add('trail');
+                    square.classList.remove('clickable');
+                    square.removeEventListener('click', onTrailSquareClick);
+
+                    // Make only the first trail square clickable
+                    if (index === 0) {
+                        square.classList.add('clickable');
+                        square.addEventListener('click', onTrailSquareClick);
+                    }
+                }
+            });
+        }
+
+        function clearTrail() {
+            trailSquares.forEach(pos => {
+                const square = getSquareElement(pos.x, pos.y);
+                if (square) {
+                    square.classList.remove('trail', 'clickable');
+                    square.removeEventListener('click', onTrailSquareClick);
+                }
+            });
+            trailSquares = [];
+        }
+
         function endGame() {
-            if (gameEnded) return;
-            gameEnded = true;
             clearTimeout(timer);
             alert(`Game Over! Your score: ${score}`);
             if (score > highScore) {
@@ -251,16 +407,35 @@
                 localStorage.setItem('highScore', highScore);
                 highScoreElement.textContent = highScore;
             }
-            mainMenu.style.display = 'block';
+            activeX = undefined;
+            activeY = undefined;
+            trailSquares = [];
             gameContainer.style.display = 'none';
+            mainMenu.style.display = 'block';
         }
 
         function onResize() {
             if (gameContainer.style.display === 'flex') {
+                setGameContainerHeight();
                 initializeGrid();
-                placeActiveSquare();
+                if (activeX >= gridSizeX || activeY >= gridSizeY) {
+                    endGame();
+                } else {
+                    placeActiveSquare();
+                    updateTrailSquares();
+                }
             }
         }
+
+        function setGameContainerHeight() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+            gameContainer.style.height = `calc(var(--vh, 1vh) * 100)`;
+        }
+
+        // Initial setup for game container height
+        setGameContainerHeight();
+        window.addEventListener('resize', setGameContainerHeight);
     </script>
 </body>
 </html>
